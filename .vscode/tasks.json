@@ -3,15 +3,8 @@
         {
             "type": "shell",
             "label": "clang++ build",
-            "command": "clang++",
-            "args": [
-                "${file}",
-                "-std=c++17",
-                "-stdlib=libc++",
-                "-g",
-                "-o",
-                "${fileDirname}/build/${fileBasenameNoExtension}"
-            ],
+            "command": "mkdir -p ${fileDirname}/build && clang++ ${file} -std=c++17 -stdlib=libc++ -g -o ${fileDirname}/build/${fileBasenameNoExtension}",
+            "args": [],
             "problemMatcher": [
                 "$gcc"
             ],
@@ -32,9 +25,9 @@
             "dependsOn": [
                 "clean output"
             ],
-            "command": "clang++ ${file} -std=c++17 -stdlib=libc++ -g -o ${fileDirname}/build/${fileBasenameNoExtension} && cat ${fileDirname}/input | ${fileDirname}/build/${fileBasenameNoExtension} > ${fileDirname}/output",
+            "command": "mkdir -p ${fileDirname}/build && clang++ ${file} -std=c++17 -stdlib=libc++ -g -o ${fileDirname}/build/${fileBasenameNoExtension} && cat ${fileDirname}/input | ${fileDirname}/build/${fileBasenameNoExtension} > ${fileDirname}/output",
             "options": {
-                "cwd": "${fileDirname}/build"
+                "cwd": "${workspaceFolder}"
             },
             "problemMatcher": [
                 "$gcc"
