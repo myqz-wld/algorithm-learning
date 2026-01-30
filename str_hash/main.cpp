@@ -13,48 +13,85 @@
 有哈希碰撞的概率（但概率很小），可以用双值哈希来降低碰撞概率
 双值哈希的意思是用两个不同的大质数M1、M2，得到两个不同的哈希函数f1、f2，
 只有两个哈希函数都匹配上时，才认为字符串相同
-*/
-constexpr int M = 1e9 + 7;
-constexpr int A = 31;
-std::vector<int> str_hash(std::string str) {
-    int n = str.length();
-    std::vector<int> result(n + 1, 0);
-    long long hash = 0;
-    long long base = 1;
-    for (int i = 0; i < n; i++) {
-        hash += str[i] * base;
-        hash %= M;
-        base *= A;
-        base %= M;
-        result[i + 1] = hash;
-    }
-    return result;
-}
 
-// 用字符串哈希做字符串匹配
-std::vector<int> match(std::string str, std::string target) {
-    // 搜索字符串的哈希值列表
-    std::vector<int> hashs = str_hash(str);
-    // 目标字符串哈希值
-    int hash = str_hash(target).back();
-    std::vector<int> result;
-    int n = str.length(), m = target.length();
-    long long base = 1;
-    for (int i = 0; i < n; i++) {
-        // 子字符串的哈希值可以通过计算得出
-        if ((hashs[i + m] - hashs[i] + M) % M == (hash * base) % M) {
-            result.push_back(i);
+为了防止被Hack，可以使用动态的M和A
+*/
+class string_hash {
+    static constexpr int N = 1e6 + 5;
+    static constexpr long long M = 1e9 + 7;
+    static constexpr long long A = 31;
+    static std::vector<long long> _inv_pw;  // 预计算逆元
+
+public:
+    // 快速幂
+    static long long qpow(long long a, long long b) {
+        long long res = 1;
+        while (b) {
+            if (b & 1) res = res * a % M;
+            a = a * a % M;
+            b >>= 1;
         }
-        base *= A;
-        base %= M;
+        return res;
     }
-    return result;
-}
+
+    // 初始化逆元数组（需在使用前调用一次）
+    static void init() {
+        if (_inv_pw.size() > 1) return;
+        _inv_pw.resize(N);
+        _inv_pw[0] = 1;
+        long long inv_a = qpow(A, M - 2);
+        for (int i = 1; i < N; i++) {
+            _inv_pw[i] = _inv_pw[i - 1] * inv_a % M;
+        }
+    }
+
+    // 根据字符串生成哈希数组
+    static std::vector<long long> build(const std::string& str) {
+        int n = str.length();
+        std::vector<long long> hashs(n + 1, 0);
+        long long hash = 0, base = 1;
+        for (int i = 0; i < n; i++) {
+            hash = (hash + str[i] * base) % M;
+            base = base * A % M;
+            hashs[i + 1] = hash;
+        }
+        return hashs;
+    }
+
+    // 获取子串 [l, r) 的哈希值（标准化到位置0）
+    static long long get(const std::vector<long long>& hashs, int l, int r) {
+        return (hashs[r] - hashs[l] + M) % M * _inv_pw[l] % M;
+    }
+
+    // 比较两个子串 [l1, r1) 和 [l2, r2) 是否相等
+    static bool equal(const std::vector<long long>& hashs, int l1, int r1, int l2, int r2) {
+        if (r1 - l1 != r2 - l2) return false;
+        return get(hashs, l1, r1) == get(hashs, l2, r2);
+    }
+
+    // 字符串匹配，返回所有匹配位置
+    static std::vector<int> match(const std::vector<long long>& hashs, const std::vector<long long>& target) {
+        std::vector<int> result;
+        int n = hashs.size() - 1;
+        int m = target.size() - 1;
+        long long target_hash = target[m];
+        for (int i = 0; i + m <= n; i++) {
+            if (get(hashs, i, i + m) == target_hash) {
+                result.push_back(i);
+            }
+        }
+        return result;
+    }
+};
+std::vector<long long> string_hash::_inv_pw;
 
 int main(int argc, char const *argv[]) {
+    string_hash::init();
     std::string str, target;
     std::cin >> str >> target;
-    std::vector<int> indexs = match(str, target);
+    auto hashs = string_hash::build(str);
+    auto target_hashs = string_hash::build(target);
+    std::vector<int> indexs = string_hash::match(hashs, target_hashs);
     for (int index : indexs) {
         std::cout << index << ' ';
     }
