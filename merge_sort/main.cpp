@@ -3,114 +3,85 @@
 #include <functional>
 
 /*
-归并排序
-主要思路是将大数组拆分为两个小数组，对两个小数组排序后（可以递归地调用归并排序），再对大数组进行排序。
-假设大数组的元素数量为n，在两个小数组有序的基础上，对大数组进行排序的时间复杂度为O(n)，所以整体的时间复杂度是：
-T(n) = 2 * T(n / 2) + O(n)
-一直递推这个公式，可以得到：
-T(n) = O(nlog(n))
-空间复杂度为O(n)
+归并排序 (Merge Sort)
+分治思想：将数组一分为二，递归排序后合并两个有序子数组。
+
+合并过程（两个有序数组合为一个有序数组）：
+  左: [1, 3, 5]   右: [2, 4, 6]
+  双指针从头比较，较小的先放入结果：
+  → [1] → [1,2] → [1,2,3] → [1,2,3,4] → [1,2,3,4,5] → [1,2,3,4,5,6]
+
+递推公式：T(n) = 2T(n/2) + O(n)
+  每层合并总共 O(n)，共 logn 层 → O(nlogn)
+
+时间复杂度：O(nlogn)  最好/最坏/平均均如此
+空间复杂度：O(n)
+稳定排序
 */
-template<class T>
-void merge_sort(std::vector<T>& ts) {
-    int n = ts.size();
-    // 临时空间
-    std::vector<T> temp(n);
-    // 对[left, right]区域内的元素进行排序
-    std::function<void(int, int)> help = [&](int left, int right) -> void {
-        // 如果只有一个元素，不需要排序
-        if (left == right) {
-            return;
-        }
-        int middle = left + (right - left) / 2;
-        // 对[left, middle]排序
-        help(left, middle);
-        // 对[middle + 1, right]排序
-        help(middle + 1, right);
-        // 基于两个小数组有序的基础上，对大数组进行排序
-        int p = left, q = middle + 1, index = 0;
-        while (p <= middle && q <= right) {
-            // T视情况重载 < 操作符
-            if (ts[p] < ts[q]) {
-                temp[index++] = ts[p++];
-            } else {
-                temp[index++] = ts[q++];
-            }
-        }
-        while (p <= middle) {
-            temp[index++] = ts[p++];
-        }
-        while (q <= right) {
-            temp[index++] = ts[q++];
-        }
-        // 将临时空间里的元素复制给原数组
-        for (int i = 0; i < index; i++) {
-            ts[i + left] = temp[i];
-        }
+
+template<typename T, typename Compare = std::less<T>>
+void merge_sort(std::vector<T>& arr, Compare cmp = Compare()) {
+    int n = arr.size();
+    if (n <= 1) return;
+    std::vector<T> tmp(n);
+    std::function<void(int, int)> sort = [&](int l, int r) {
+        if (l >= r) return;
+        int m = l + (r - l) / 2;
+        sort(l, m);
+        sort(m + 1, r);
+        int i = l, j = m + 1, k = 0;
+        while (i <= m && j <= r)
+            tmp[k++] = !cmp(arr[j], arr[i]) ? arr[i++] : arr[j++];
+        while (i <= m) tmp[k++] = arr[i++];
+        while (j <= r) tmp[k++] = arr[j++];
+        for (int i = 0; i < k; i++) arr[l + i] = tmp[i];
     };
-    help(0, n - 1);
+    sort(0, n - 1);
 }
 
-// 需要传入自定义比较函数
-template<class T, typename F>
-void merge_sort(std::vector<T>& ts, F compare) {
-    int n = ts.size();
-    // 临时空间
-    std::vector<T> temp(n);
-    // 对[left, right]区域内的元素进行排序
-    std::function<void(int, int)> help = [&](int left, int right) -> void {
-        // 如果只有一个元素，不需要排序
-        if (left == right) {
-            return;
-        }
-        int middle = left + (right - left) / 2;
-        // 对[left, middle]排序
-        help(left, middle);
-        // 对[middle + 1, right]排序
-        help(middle + 1, right);
-        // 基于两个小数组有序的基础上，对大数组进行排序
-        int p = left, q = middle + 1, index = 0;
-        while (p <= middle && q <= right) {
-            // 使用自定义比较函数
-            if (compare(ts[p], ts[q])) {
-                temp[index++] = ts[p++];
-            } else {
-                temp[index++] = ts[q++];
-            }
-        }
-        while (p <= middle) {
-            temp[index++] = ts[p++];
-        }
-        while (q <= right) {
-            temp[index++] = ts[q++];
-        }
-        // 将临时空间里的元素复制给原数组
-        for (int i = 0; i < index; i++) {
-            ts[i + left] = temp[i];
-        }
-    };
-    help(0, n - 1);    
-}
+int main() {
+    // 默认升序
+    std::vector<int> a = {5, 3, 1, 4, 2};
+    merge_sort(a);
+    std::cout << "asc:  ";
+    for (int x : a) std::cout << x << ' ';
+    std::cout << '\n';  // 输出: 1 2 3 4 5
 
+    // 自定义降序
+    merge_sort(a, std::greater<int>());
+    std::cout << "desc: ";
+    for (int x : a) std::cout << x << ' ';
+    std::cout << '\n';  // 输出: 5 4 3 2 1
 
-int main(int argc, char const *argv[]) {
-    int n;
-    std::cin >> n;
-    std::vector<int> nums(n);
-    for (int i = 0; i < n; i++) {
-        std::cin >> nums[i];
-    }
-    merge_sort(nums);
-    for (int i = 0; i < n; i++) {
-        std::cout << nums[i] << ' ';
-    }
-    std::cout << '\n';
-    merge_sort(nums, [](int a, int b) {
-        return a > b;
-    });
-    for (int i = 0; i < n; i++) {
-        std::cout << nums[i] << ' ';
-    }
-    std::cout << '\n';
+    // 稳定性验证：相等元素保持原始顺序
+    std::vector<std::pair<int,char>> b = {{3,'a'}, {1,'b'}, {3,'c'}, {1,'d'}};
+    merge_sort(b, [](auto& x, auto& y) { return x.first < y.first; });
+    std::cout << "stable: ";
+    for (auto& [v, c] : b) std::cout << v << c << ' ';
+    std::cout << '\n';  // 输出: 1b 1d 3a 3c
+
     return 0;
 }
+
+/*
+=== STL sort 用法 ===
+
+#include <algorithm>
+
+std::vector<int> v = {5, 3, 1, 4, 2};
+
+// 升序（默认）
+std::sort(v.begin(), v.end());
+
+// 降序
+std::sort(v.begin(), v.end(), std::greater<int>());
+
+// 自定义比较器
+std::sort(v.begin(), v.end(), [](int a, int b) { return a > b; });
+
+// 稳定排序（保持相等元素的相对顺序，归并排序实现）
+std::stable_sort(v.begin(), v.end());
+
+// 注意：std::sort 使用 IntroSort（快排+堆排+插入排序），平均 O(nlogn)
+//       std::stable_sort 使用归并排序，O(nlogn) 但需要 O(n) 额外空间
+*/

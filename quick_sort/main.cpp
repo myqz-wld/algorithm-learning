@@ -3,115 +3,77 @@
 #include <functional>
 
 /*
-快速排序
-主要思路是选定一个数字，把小于该数字的数字放在该数字的左边，把大于该数字的数字放在该数字的右边
-然后在该数字的左边和右边再各选定一个数字，进行递归
+快速排序 (Quick Sort)
+选取 pivot，将小于 pivot 的放左边，大于的放右边，递归处理两半。
 
-假设数组大小为n
-时间复杂度平均O(nlogn)，最差O(n^2)
-空间复杂度O(1)
+Lomuto 分区过程（以首元素 3 为 pivot）：
+  [3, 5, 1, 4, 2]
+   ^pivot
+  用指针 i 维护 "< pivot 区域" 的右边界，j 扫描数组：
+  j=1: 5 >= 3 → 跳过
+  j=2: 1 < 3  → i++, swap(arr[1],arr[2]) → [3, 1, 5, 4, 2]
+  j=3: 4 >= 3 → 跳过
+  j=4: 2 < 3  → i++, swap(arr[2],arr[4]) → [3, 1, 2, 4, 5]
+  最后 swap(pivot, arr[i]) → [2, 1, 3, 4, 5]
+  pivot 归位到下标 2，递归排序左右两半
+
+时间复杂度：平均 O(nlogn)，最差 O(n²)（有序数组 + 固定选首元素）
+空间复杂度：O(logn) 递归栈
+不稳定排序
 */
-template<class T>
-void quick_sort(std::vector<T>& ts) {
-    // 数组大小
-    int n = ts.size();
-    std::function<void(int, int)> help = [&](int left, int right) {
-        // 如果少于等于一个元素，不用进行排序
-        if (left >= right) {
-            return;
-        }
-        // 这里直接选定left为目标数字
-        // 目标数字的选择直接影响到快速排序的效率，有更多好的选择方法，这边采取最简单的实现
-        int pivot = left;
-        int l = left + 1, r = right;
-        while (l <= r) {
-            // 将l指向大于等于目标数字的数字（不存在的话，l的值会是right + 1）
-            while (l <= r && ts[l] < ts[pivot]) {
-                l++;
-            } 
-            // 将r指向小于目标数字的数字（不存在的话，r的值会是left）
-            while (l <= r && ts[r] >= ts[pivot]) {
-                r--;
-            }
-            // 上面保证了l != r
-            if (l < r) {
-                // 如果l < r，直接对两个数字进行交换
-                std::swap(ts[l], ts[r]);
-                // 移动l和r
-                l++, r--;
-            } else {
-                // 如果l > r，说明分组完毕，交换l - 1和pivot
-                std::swap(ts[pivot], ts[l - 1]);
-            }
-        }
-        // 递归[left, l - 2]和[l, right]
-        help(left, l - 2);
-        help(l, right);
+
+template<typename T, typename Compare = std::less<T>>
+void quick_sort(std::vector<T>& arr, Compare cmp = Compare()) {
+    int n = arr.size();
+    if (n <= 1) return;
+    std::function<void(int, int)> sort = [&](int lo, int hi) {
+        if (lo >= hi) return;
+        int i = lo;
+        for (int j = lo + 1; j <= hi; j++)
+            if (cmp(arr[j], arr[lo]))
+                std::swap(arr[++i], arr[j]);
+        std::swap(arr[lo], arr[i]);
+        sort(lo, i - 1);
+        sort(i + 1, hi);
     };
-    help(0, n - 1);
+    sort(0, n - 1);
 }
 
-template<class T, typename F>
-void quick_sort(std::vector<T>& ts, F compare) {
-    // 数组大小
-    int n = ts.size();
-    std::function<void(int, int)> help = [&](int left, int right) {
-        // 如果少于等于一个元素，不用进行排序
-        if (left >= right) {
-            return;
-        }
-        // 这里直接选定left为目标数字
-        // 目标数字的选择直接影响到快速排序的效率，有更多好的选择方法，这边采取最简单的实现
-        int pivot = left;
-        int l = left + 1, r = right;
-        while (l <= r) {
-            // 将l指向大于等于目标数字的数字（不存在的话，l的值会是right + 1）
-            // 使用自定义比较函数
-            while (l <= r && compare(ts[l], ts[pivot])) {
-                l++;
-            } 
-            // 将r指向小于目标数字的数字（不存在的话，r的值会是left）
-            // 使用自定义比较函数
-            while (l <= r && !compare(ts[r], ts[pivot])) {
-                r--;
-            }
-            // 上面保证了l != r
-            if (l < r) {
-                // 如果l < r，直接对两个数字进行交换
-                std::swap(ts[l], ts[r]);
-                // 移动l和r
-                l++, r--;
-            } else {
-                // 如果l > r，说明分组完毕，交换l - 1和pivot
-                std::swap(ts[pivot], ts[l - 1]);
-            }
-        }
-        // 递归[left, l - 2]和[l, right]
-        help(left, l - 2);
-        help(l, right);
-    };
-    help(0, n - 1);   
-}
+int main() {
+    // 默认升序
+    std::vector<int> a = {5, 3, 1, 4, 2};
+    quick_sort(a);
+    std::cout << "asc:  ";
+    for (int x : a) std::cout << x << ' ';
+    std::cout << '\n';  // 输出: 1 2 3 4 5
 
+    // 自定义降序
+    quick_sort(a, std::greater<int>());
+    std::cout << "desc: ";
+    for (int x : a) std::cout << x << ' ';
+    std::cout << '\n';  // 输出: 5 4 3 2 1
 
-int main(int argc, char const *argv[]) {
-    int n;
-    std::cin >> n;
-    std::vector<int> nums(n);
-    for (int i = 0; i < n; i++) {
-        std::cin >> nums[i];
-    }
-    quick_sort(nums);
-    for (int i = 0; i < n; i++) {
-        std::cout << nums[i] << ' ';
-    }
-    std::cout << '\n';;
-    quick_sort(nums, [](int a, int b) {
-        return a > b;
-    });
-    for (int i = 0; i < n; i++) {
-        std::cout << nums[i] << ' ';
-    }
-    std::cout << '\n';;
+    // 单元素和空数组
+    std::vector<int> b = {42};
+    quick_sort(b);
+    std::cout << "single: " << b[0] << '\n';  // 输出: 42
+
     return 0;
 }
+
+/*
+=== STL sort 用法 ===
+
+#include <algorithm>
+
+// std::sort 内部使用 IntroSort（快排变体），是实践中最常用的排序
+std::vector<int> v = {5, 3, 1, 4, 2};
+std::sort(v.begin(), v.end());                         // 升序
+std::sort(v.begin(), v.end(), std::greater<int>());    // 降序
+
+// nth_element: 快速选择算法，O(n) 找第 k 小元素
+std::nth_element(v.begin(), v.begin() + 2, v.end());   // v[2] 是第 3 小的元素
+
+// partial_sort: 部分排序，O(nlogk) 只排前 k 个
+std::partial_sort(v.begin(), v.begin() + 3, v.end());  // 前 3 个元素有序
+*/

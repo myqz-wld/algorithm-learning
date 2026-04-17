@@ -3,155 +3,120 @@
 #include <functional>
 
 /*
-最近公共祖先
+最近公共祖先 LCA (Lowest Common Ancestor)
+
+=== 朴素法 ===
+
+将两个节点提升到相同深度，然后同步向上走直到相遇。
+预处理：O(N)  查询：O(N)
+
+=== 倍增法 (Binary Lifting) ===
+
+预计算 up[i][j] = 节点 i 的第 2^j 个祖先。
+递推：up[i][j] = up[up[i][j-1]][j-1]
+  即：走 2^j 步 = 先走 2^(j-1) 步，再走 2^(j-1) 步
+
+查询 LCA(u, v)：
+1. 将深的节点提升到和浅的相同深度（二进制拆分跳跃）
+2. 若此时 u == v，返回（v 是 u 的祖先）
+3. 否则 u, v 同步倍增跳跃，找到 LCA 的直接子节点，再上跳一步
+
+预处理：O(NlogN)  查询：O(logN)
+
+示例树：
+       0
+      / \
+     1   2
+    / \   \
+   3   4   5
 */
 
-/*
-parents[i]代表i的父节点，parents[i] == -1，代表i是根节点
-查询a和b的最近公共祖先
-*/
-int lca(std::vector<int>& parents, int a, int b) {
-    // 节点总数
-    int n = parents.size();
-    // 建图
-    std::vector<std::vector<int>> grid(n);
-    int root;
-    for (int i = 0; i < n; i++) {
-        if (parents[i] == -1) {
-            root = i;
-            continue;
-        }
-        grid[parents[i]].push_back(i);
-    }
-
-    // dfs遍历查找最近公共祖先
-    // 0-子树中不存在a和b 1-子树中存在a 2-子树中存在b 3-子树中存在a和b
-    int result = -1;
-    std::function<int(int)> dfs = [&](int cur) -> int {
-        int flag = 0;
-        if (cur == a) {
-            flag |= 1;
-        }
-        if (cur == b) {
-            flag |= 2;
-        }
-        for (int next : grid[cur]) {
-            flag |= dfs(next);
-        }
-        if (flag == 3 && result == -1) {
-            // 当flag第一次变为3的时候，代表cur是a和b的最近公共祖先
-            result = cur;
-        }
-        return flag;
+// 朴素法：逐步上跳
+int lca_naive(const std::vector<int>& parents, int u, int v) {
+    auto get_depth = [&](int x) {
+        int d = 0;
+        while (parents[x] != -1) { x = parents[x]; d++; }
+        return d;
     };
-    dfs(root);
-    return result;
+    int du = get_depth(u), dv = get_depth(v);
+    while (du > dv) { u = parents[u]; du--; }
+    while (dv > du) { v = parents[v]; dv--; }
+    while (u != v) { u = parents[u]; v = parents[v]; }
+    return u;
 }
 
-/*
-主要思路是通过倍增法来加速最近公共祖先的寻找
+// 倍增法
+class LCA {
+    int n, LOG;
+    std::vector<int> depth;
+    std::vector<std::vector<int>> up;
 
-parents[i]代表i的父节点，parents[i] == -1，代表i是根节点
-queries[i]代表查询请求，要查询queries[i][0]和queries[i][1]的最近公共祖先
-*/
-std::vector<int> lca(std::vector<int>& parents, std::vector<std::vector<int>>& queries) {
-    // 节点总数
-    int n = parents.size();
-    // 建图计算节点深度
-    std::vector<std::vector<int>> grid(n);
-    int root;
-    for (int i = 0; i < n; i++) {
-        if (parents[i] == -1) {
-            root = i;
-            continue;
+public:
+    LCA(const std::vector<int>& parents) : n(parents.size()) {
+        LOG = 1;
+        while ((1 << LOG) < n) LOG++;
+        LOG++;
+
+        std::vector<std::vector<int>> children(n);
+        int root = -1;
+        for (int i = 0; i < n; i++) {
+            if (parents[i] == -1) root = i;
+            else children[parents[i]].push_back(i);
         }
-        grid[parents[i]].push_back(i);
-    }
-    std::vector<int> depths(n);
-    depths[root] = 0;
-    std::function<void(int)> dfs = [&](int cur) -> void {
-        for (int next : grid[cur]) {
-            depths[next] = depths[cur] + 1;
-            dfs(next);
-        }
-    };
-    dfs(root);
-    // 计算倍增的次数
-    int k = 0;
-    while (n >= (1 << k)) {
-        k++;
-    }
-    k++;
-    // ances[i][j]表示i的2^j级的祖先节点
-    // 可以推得：ances[i][j] = ances[ances[i][j - 1]][j - 1]
-    std::vector<std::vector<int>> ances(n, std::vector<int>(k));
-    for (int i = 0; i < n; i++) {
-        // 特殊处理，超过节点深度的都指向根节点
-        ances[i][0] = parents[i] == -1 ? i : parents[i]; 
-    }
-    for (int i = 1; i < k; i++) {
-        for (int j = 0; j < n; j++) {
-            ances[j][i] = ances[ances[j][i - 1]][i - 1];
-        }
-    }
-    // 定义查找最近公共祖先的函数
-    std::function<int(int, int)> find = [&](int x, int y) -> int {
-        if (depths[x] < depths[y]) {
-            // 让x节点的深度大于等于y节点的深度
-            return find(y, x);
-        }
-        if (depths[x] != depths[y]) {
-            // 如果x节点的深度不等于y节点的深度，先找到与y节点同一深度的x节点的祖先
-            for (int i = k - 1; i >= 0; i--) {
-                if (depths[ances[x][i]] >= depths[y]) {
-                    x = ances[x][i];
-                }
+
+        depth.assign(n, 0);
+        up.assign(n, std::vector<int>(LOG));
+        for (int i = 0; i < n; i++)
+            up[i][0] = (parents[i] == -1) ? i : parents[i];
+        for (int j = 1; j < LOG; j++)
+            for (int i = 0; i < n; i++)
+                up[i][j] = up[up[i][j - 1]][j - 1];
+
+        std::function<void(int)> dfs = [&](int u) {
+            for (int v : children[u]) {
+                depth[v] = depth[u] + 1;
+                dfs(v);
             }
-        }
-        if (x != y) {
-            // 如果x节点不等于y节点，找x节点和y节点的最近公共祖先
-            for (int i = k - 1; i >= 0; i--) {
-                if (ances[x][i] != ances[y][i]) {
-                    x = ances[x][i];
-                    y = ances[y][i];
-                }
+        };
+        dfs(root);
+    }
+
+    int query(int u, int v) const {
+        if (depth[u] < depth[v]) std::swap(u, v);
+        int diff = depth[u] - depth[v];
+        for (int j = 0; j < LOG; j++)
+            if ((diff >> j) & 1) u = up[u][j];
+        if (u == v) return u;
+        for (int j = LOG - 1; j >= 0; j--)
+            if (up[u][j] != up[v][j]) {
+                u = up[u][j];
+                v = up[v][j];
             }
-            x = ances[x][0];
-            y = ances[y][0];
-        }
-        return x;
-    };
-    // 进行查询
-    int m = queries.size();
-    std::vector<int> result(m);
-    for (int i = 0; i < m; i++) {
-        result[i] = find(queries[i][0], queries[i][1]);
+        return up[u][0];
     }
-    return result;
-}
+};
 
+int main() {
+    //        0
+    //       / \
+    //      1   2
+    //     / \   \
+    //    3   4   5
+    std::vector<int> parents = {-1, 0, 0, 1, 1, 2};
 
-int main(int argc, char const *argv[]) {
-    int n;
-    std::cin >> n;
-    std::vector<int> parents(n);
-    for (int i = 0; i < n; i++) {
-        std::cin >> parents[i];
-    }
-    int m;
-    std::cin >> m;
-    std::vector<std::vector<int>> queries(m, std::vector<int>(2));
-    for (int i = 0; i < m; i++) {
-        std::cin >> queries[i][0] >> queries[i][1];
-    }
-    for (int i = 0; i < m; i++) {
-        std::cout << lca(parents, queries[i][0], queries[i][1]) << ' ';
-    }
-    std::cout << '\n';
-    std::vector<int> result = lca(parents, queries);
-    for (int i = 0; i < m; i++) {
-        std::cout << result[i] << ' ';
-    }
-    std::cout << '\n';
+    // 朴素法
+    std::cout << "naive:\n";
+    std::cout << "  LCA(3,4) = " << lca_naive(parents, 3, 4) << '\n';  // 输出: 1
+    std::cout << "  LCA(3,5) = " << lca_naive(parents, 3, 5) << '\n';  // 输出: 0
+    std::cout << "  LCA(1,4) = " << lca_naive(parents, 1, 4) << '\n';  // 输出: 1
+
+    // 倍增法
+    LCA lca(parents);
+    std::cout << "binary lifting:\n";
+    std::cout << "  LCA(3,4) = " << lca.query(3, 4) << '\n';  // 输出: 1
+    std::cout << "  LCA(3,5) = " << lca.query(3, 5) << '\n';  // 输出: 0
+    std::cout << "  LCA(1,4) = " << lca.query(1, 4) << '\n';  // 输出: 1
+    std::cout << "  LCA(0,5) = " << lca.query(0, 5) << '\n';  // 输出: 0
+
     return 0;
 }

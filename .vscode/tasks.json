@@ -4,34 +4,29 @@
             "type": "shell",
             "label": "clang++ build",
             "command": "mkdir -p ${fileDirname}/build && clang++ ${file} -std=c++17 -stdlib=libc++ -g -o ${fileDirname}/build/${fileBasenameNoExtension}",
-            "args": [],
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": ["$gcc"],
             "detail": "构建"
         },
         {
             "type": "shell",
             "label": "clean output",
             "command": "echo '' > ${fileDirname}/output",
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": [],
             "detail": "清除输出"
         },
         {
             "type": "shell",
             "label": "clang++ build and run",
             "dependsOn": [
-                "clean output"
+                "clean output",
+                "clang++ build"
             ],
-            "command": "mkdir -p ${fileDirname}/build && clang++ ${file} -std=c++17 -stdlib=libc++ -g -o ${fileDirname}/build/${fileBasenameNoExtension} && cat ${fileDirname}/input | ${fileDirname}/build/${fileBasenameNoExtension} > ${fileDirname}/output",
+            "dependsOrder": "sequence",
+            "command": "cat ${fileDirname}/input | ${fileDirname}/build/${fileBasenameNoExtension} > ${fileDirname}/output",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": [],
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -41,10 +36,8 @@
         {
             "type": "shell",
             "label": "clear",
-            "command": "rm -rf ${fileDirname}/build/**",
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "command": "rm -rf ${fileDirname}/build",
+            "problemMatcher": [],
             "detail": "清理"
         }
     ],

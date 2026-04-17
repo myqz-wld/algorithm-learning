@@ -1,88 +1,146 @@
 #include <iostream>
 #include <vector>
+#include <string>
 
 /*
-KMP
-主要思路是通过已经匹配的局部信息来加速整体的匹配
-假设在字符串 ababaccc 中匹配字符串 abac，在第一次匹配过程中：
-0123456
-ababacc
-abac
-在下标3处发现不一致（b != c），暴力的做法是将 abac 字符串右移1位后，再次从头进行匹配，
-但我们已知 aba 是匹配的，所以可以直接右移2位（右移1位一定匹配不上），这个其实就是通过字符串 aba 的最大公共前后缀来加速匹配。
-对于字符串 abac 来说，知道字符串 aba 的最大公共前后缀，也能加速寻找自身的最大公共前后缀，不是从头开始寻找：
-abac
- abac
-而是，可以直接进行如下尝试：
-abac
-  abac
+KMP (Knuth-Morris-Pratt)
+字符串匹配算法，通过预处理模式串的最长公共前后缀（next 数组）跳过无效比较。
 
-假设字符串长度为m，目标字符串长度为n
-时间复杂度O(m + n)
-空间复杂度O(n)
+时间复杂度：O(n + m)  n=文本长度, m=模式长度
+空间复杂度：O(m)
+
+=== next 数组 ===
+
+next[i] = pattern[0..i] 的最长公共真前后缀长度。
+
+以 "ababac" 为例：
+  子串      最长公共真前后缀   next[i]
+  a         无                0
+  ab        无                0
+  aba       a = a             1
+  abab      ab = ab           2
+  ababa     aba = aba         3
+  ababac    无                0
+
+为什么有用？假设匹配到 "ababa" 后失配：
+  text:    ...ababaXXXX...
+  pattern:    ababac
+                   ^ 失配，已匹配 "ababa"，next[4]=3
+  已匹配后缀 "aba" 同时是模式串前缀，直接跳到 j=3 继续比较：
+  text:    ...ababaXXXX...
+  pattern:      ababac
+                ^^^已知匹配
+
+=== 构建 next ===
+
+本质是模式串对自身做匹配，双指针 i 和 j：
+  pattern: a b a b a c
+  i=1: 'b' vs 'a' → 不等, j=0          → next[1]=0
+  i=2: 'a' vs 'a' → 相等, j=1          → next[2]=1
+  i=3: 'b' vs 'b' → 相等, j=2          → next[3]=2
+  i=4: 'a' vs 'a' → 相等, j=3          → next[4]=3
+  i=5: 'c' vs 'b' → 不等, 回退 j=next[2]=1
+       'c' vs 'b' → 不等, 回退 j=next[0]=0
+       'c' vs 'a' → 不等, j=0          → next[5]=0
+  回退的本质：当前前后缀匹配不上，退而求其次尝试次长的公共前后缀。
+
+=== 匹配过程 ===
+
+和构建 next 逻辑一致，text 的 i 指针永远不回退，只有 j 在跳。
+为什么 O(n+m)：j 每次回退消耗之前 j++ 攒的值，总回退 <= 总前进。
 */
 
+class KMP {
+    std::string pattern;
+    std::vector<int> next;
 
-std::vector<int> get_next(std::string str) {
-    int n = str.length();
-    // next[i]表示[0:i]的最大公共前后缀长度
-    // 初始全部默认为0
-    std::vector<int> next(n, 0);
-    // 下面这部分的时间复杂度为O(n)
-    // 可以理解为每次计算完下标后，就将该下标入栈，一旦后续求最大公共长度时，越过了该下标，就将该下标出栈
-    // 每个元素只会入栈出栈一次，所以时间复杂度为O(n)
-    // 从下标1开始迭代，按照定义，下标0的最大公共前后缀长度就是0
-    for (int i = 1; i < n; i++) {
-        int index = i;
-        do {
-            // index - 1 下标的最大公共前后缀长度，也是我们尝试进行匹配的位置
-            index = next[index - 1];
-            if (str[index] == str[i]) {
-                // 匹配成功就更新，并跳出迭代
-                next[i] = index + 1;
-                break;
-            }
-            // 匹配不成功就继续迭代尝试，直到最大公共前后缀长度为0
-        } while (index != 0);
-    }
-    return next;
-}
-
-std::vector<int> kmp(std::string str, std::string target) {
-    std::vector<int> next = get_next(target);
-    std::vector<int> result;
-    int p = 0, q = 0;
-    while (p < str.length()) {
-        if (str[p] == target[q]) {
-            p++;
-            q++;
-        } else {
-            if (q == 0) {
-                // 如果在下标0就已经匹配不上，移动p指针
-                p++;
-            } else {
-                // 根据已匹配的最大公共前后缀进行移动
-                q = next[q - 1];
-            }
-        }
-
-        if (q == target.length()) {
-            // 匹配成功，加入到结果集合中
-            result.push_back(p - q);
-            // 根据已匹配的最大公共前后缀移动
-            q = next[q - 1];
+    void build() {
+        int m = pattern.size();
+        next.assign(m, 0);
+        for (int i = 1, j = 0; i < m; i++) {
+            while (j > 0 && pattern[i] != pattern[j])
+                j = next[j - 1];
+            if (pattern[i] == pattern[j]) j++;
+            next[i] = j;
         }
     }
-    return result;
-}
 
-int main(int argc, char const *argv[]) {
-    std::string str, target;
-    std::cin >> str >> target;
-    std::vector<int> indexs = kmp(str, target);
-    for (int index : indexs) {
-        std::cout << index << ' ';
+public:
+    KMP(const std::string& p) : pattern(p) { build(); }
+
+    // 返回所有匹配位置
+    std::vector<int> search(const std::string& text) const {
+        std::vector<int> res;
+        int n = text.size(), m = pattern.size();
+        for (int i = 0, j = 0; i < n; i++) {
+            while (j > 0 && text[i] != pattern[j])
+                j = next[j - 1];
+            if (text[i] == pattern[j]) j++;
+            if (j == m) {
+                res.push_back(i - m + 1);
+                j = next[j - 1];
+            }
+        }
+        return res;
     }
-    std::cout << '\n';
+
+    // 返回第一个匹配位置，未找到返回 -1
+    int find(const std::string& text) const {
+        int n = text.size(), m = pattern.size();
+        for (int i = 0, j = 0; i < n; i++) {
+            while (j > 0 && text[i] != pattern[j])
+                j = next[j - 1];
+            if (text[i] == pattern[j]) j++;
+            if (j == m) return i - m + 1;
+        }
+        return -1;
+    }
+
+    const std::vector<int>& get_next() const { return next; }
+};
+
+int main() {
+    // search: 查找所有匹配位置
+    KMP kmp("ab");
+    auto pos = kmp.search("ababab");
+    std::cout << "search: ";
+    for (int p : pos) std::cout << p << ' ';
+    std::cout << '\n';  // 输出: 0 2 4
+
+    // find: 查找第一个匹配位置
+    KMP kmp2("abc");
+    std::cout << "find: " << kmp2.find("xyzabcdef") << '\n';  // 输出: 3
+    std::cout << "find: " << kmp2.find("xyz") << '\n';         // 输出: -1
+
+    // next 数组
+    KMP kmp3("ababac");
+    std::cout << "next: ";
+    for (int v : kmp3.get_next()) std::cout << v << ' ';
+    std::cout << '\n';  // 输出: 0 0 1 2 3 0
+
     return 0;
 }
+
+/*
+=== STL string::find 用法 ===
+
+#include <string>
+
+std::string text = "ababab";
+std::string pattern = "ab";
+
+// 查找第一个匹配
+size_t pos = text.find(pattern);          // 0
+size_t pos2 = text.find(pattern, 2);      // 从下标2开始查找，返回2
+// 未找到返回 std::string::npos
+
+// 查找所有匹配
+std::vector<int> positions;
+size_t p = text.find(pattern);
+while (p != std::string::npos) {
+    positions.push_back(p);
+    p = text.find(pattern, p + 1);
+}
+
+// 注意：string::find 最坏 O(n*m)，不如 KMP
+*/
