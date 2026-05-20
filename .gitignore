@@ -33,3 +33,20 @@
 
 # Build directories
 **/build/
+
+# ↓ Appended by plan personal-projects-cleanup-20260520 (2026-05-20)
+# Claude Code D2 必备条目
+.claude/worktrees/
+.claude/scheduled_tasks*
+.claude/plans/
+*.log
+!plans/**/spike-reports/*.log
+.DS_Store
+Thumbs.db
+.AppleDouble
+._*
+*~
+.*.swp
+.*.swo
+*.tsbuildinfo
+__MACOSX/
